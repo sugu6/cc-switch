@@ -263,17 +263,28 @@ fn responses_json_to_anthropic_sse(
 
 #[inline]
 fn content_part_key(data: &Value) -> Option<String> {
+    // 优先使用 (item_id, content_index) 作为稳定键
     if let (Some(item_id), Some(content_index)) = (
         data.get("item_id").and_then(|v| v.as_str()),
         data.get("content_index").and_then(|v| v.as_u64()),
     ) {
         return Some(format!("part:{item_id}:{content_index}"));
     }
+    // 其次使用 (output_index, content_index)
     if let (Some(output_index), Some(content_index)) = (
         data.get("output_index").and_then(|v| v.as_u64()),
         data.get("content_index").and_then(|v| v.as_u64()),
     ) {
         return Some(format!("part:out:{output_index}:{content_index}"));
+    }
+    // 兼容网关省略了 content_index 时的 fallback：
+    // 如果提供了 item_id，使用 item_id 作为标识（因为通常只有一个输出文本块）
+    if let Some(item_id) = data.get("item_id").and_then(|v| v.as_str()) {
+        return Some(format!("part:{item_id}:0"));
+    }
+    // 如果提供了 output_index 但没有 content_index
+    if let Some(output_index) = data.get("output_index").and_then(|v| v.as_u64()) {
+        return Some(format!("part:out:{output_index}:0"));
     }
     None
 }
@@ -4522,6 +4533,12 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 }
                 // Text-only partial output is safe to expose as a max-token style
                 // incomplete turn. Close blocks before the terminal events.
+                // 尝试从 streamed_text 中获取未发送的文本内容
+                let unkeyed_remaining = if !streamed_text.unkeyed.is_empty() {
+                    Some(streamed_text.unkeyed.clone())
+                } else {
+                    None
+                };
                 let mut remaining: Vec<u32> = open_indices.iter().copied().collect();
                 remaining.sort_unstable();
                 for index in remaining {
@@ -4529,6 +4546,16 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                         "content_block_stop",
                         &json!({"type":"content_block_stop","index":index}),
                     ));
+                }
+                // 发送未发送的未键文本（流截断时保留的内容）
+                if let Some(text) = unkeyed_remaining {
+                    if !text.is_empty() {
+                        let index = next_content_index;
+                        next_content_index += 1;
+                        for event in text_block_events(index, &text) {
+                            yield Ok(event);
+                        }
+                    }
                 }
                 if !has_sent_message_start {
                     yield Ok(anthropic_sse(
@@ -4557,6 +4584,36 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
             } else {
                 // A truncated tool/reasoning block cannot be safely finalized: tool
                 // JSON may be partial and thinking may be missing its signature.
+                // 文本内容不完整但属于实质性输出的情况：
+                // 关闭未闭合的文本块，并尝试从 buffered_citation_text 提取未发送的文本。
+                // 这避免了 stream_truncated 错误导致的对话截断。
+                if preserve_web_search_citations {
+                    let pending_text = buffered_citation_text.render_pending_parts();
+                    let mut reusable_text_index = None;
+                    if !pending_text.is_empty() {
+                        if let Some(index) = current_text_index.take() {
+                            let was_open = open_indices.remove(&index);
+                            if was_open {
+                                yield Ok(anthropic_sse(
+                                    "content_block_stop",
+                                    &json!({"type":"content_block_stop","index":index}),
+                                ));
+                            } else {
+                                reusable_text_index = Some(index);
+                            }
+                        }
+                        for text in pending_text {
+                            let index = reusable_text_index.take().unwrap_or_else(|| {
+                                let index = next_content_index;
+                                next_content_index += 1;
+                                index
+                            });
+                            for event in text_block_events(index, &text) {
+                                yield Ok(event);
+                            }
+                        }
+                    }
+                }
                 yield Ok(anthropic_error_sse(
                     "Responses upstream stream ended before a terminal event",
                     "stream_truncated",

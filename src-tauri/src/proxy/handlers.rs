@@ -2261,9 +2261,44 @@ fn responses_sse_to_response_value(body: &str) -> Result<Value, ProxyError> {
         ProxyError::TransformError("No response.completed event in upstream SSE".to_string())
     })?;
 
+    // 重要修复：如果流在 output_item.done 事件之前结束（如网络中断），
+    // response.completed 事件本身可能已经包含了 output 数组。
+    // 我们应该合并两者：使用 completed 中的 output（如果存在），
+    // 并添加我们从 output_item.done 事件中单独收集的 items。
+    // 这确保了即使流被截断，已收到的输出项也不会丢失。
+    let existing_output = response.get("output").cloned();
     if !output_items.is_empty() {
+        let mut final_output = if let Some(existing) = existing_output {
+            if let Some(existing_arr) = existing.as_array() {
+                // 避免重复：只添加不在 existing 中的 items
+                let existing_ids: HashSet<&str> = existing_arr
+                    .iter()
+                    .filter_map(|item| item.get("id").and_then(|i| i.as_str()))
+                    .collect();
+                output_items
+                    .into_iter()
+                    .filter(|item| {
+                        item.get("id")
+                            .and_then(|i| i.as_str())
+                            .map(|id| !existing_ids.contains(id))
+                            .unwrap_or(true)
+                    })
+                    .chain(existing_arr.iter().cloned())
+                    .collect()
+            } else {
+                output_items
+            }
+        } else {
+            output_items
+        };
+        // 按 output_index 排序以确保顺序正确
+        final_output.sort_by(|a, b| {
+            let a_idx = a.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0);
+            let b_idx = b.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0);
+            a_idx.cmp(&b_idx)
+        });
         if let Some(obj) = response.as_object_mut() {
-            obj.insert("output".to_string(), Value::Array(output_items));
+            obj.insert("output".to_string(), Value::Array(final_output));
         } else {
             return Err(ProxyError::TransformError(
                 "response.completed payload is not an object".to_string(),
