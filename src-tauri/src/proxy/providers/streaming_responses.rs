@@ -4577,7 +4577,7 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 if let Some(text) = unkeyed_remaining {
                     if !text.is_empty() {
                         let index = next_content_index;
-                        next_content_index += 1;
+                        next_content_index = next_content_index.wrapping_add(1);
                         for event in text_block_events(index, &text) {
                             yield Ok(event);
                         }
