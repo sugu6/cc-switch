@@ -1477,39 +1477,38 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 }
 
                 let delta = value.get("delta").cloned().unwrap_or(json!({}));
-                    match delta.get("type").and_then(|t| t.as_str()).unwrap_or("") {
-                        "text_delta" => {
-                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                                append_str_field(
-                                    blocks.entry(index).or_insert(json!({})),
-                                    "text",
-                                    text,
-                                );
-                            }
+                match delta.get("type").and_then(|t| t.as_str()).unwrap_or("") {
+                    "text_delta" => {
+                        if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                            append_str_field(
+                                blocks.entry(index).or_insert(json!({})),
+                                "text",
+                                text,
+                            );
                         }
-                        "thinking_delta" => {
-                            if let Some(text) = delta.get("thinking").and_then(|t| t.as_str()) {
-                                append_str_field(
-                                    blocks.entry(index).or_insert(json!({})),
-                                    "thinking",
-                                    text,
-                                );
-                            }
-                        }
-                        "signature_delta" => {
-                            if let Some(sig) = delta.get("signature").and_then(|t| t.as_str()) {
-                                blocks.entry(index).or_insert(json!({}))["signature"] = json!(sig);
-                            }
-                        }
-                        "input_json_delta" => {
-                            if let Some(partial) =
-                                delta.get("partial_json").and_then(|t| t.as_str())
-                            {
-                                json_accum.entry(index).or_default().push_str(partial);
-                            }
-                        }
-                        _ => {}
                     }
+                    "thinking_delta" => {
+                        if let Some(text) = delta.get("thinking").and_then(|t| t.as_str()) {
+                            append_str_field(
+                                blocks.entry(index).or_insert(json!({})),
+                                "thinking",
+                                text,
+                            );
+                        }
+                    }
+                    "signature_delta" => {
+                        if let Some(sig) = delta.get("signature").and_then(|t| t.as_str()) {
+                            blocks.entry(index).or_insert(json!({}))["signature"] = json!(sig);
+                        }
+                    }
+                    "input_json_delta" => {
+                        if let Some(partial) =
+                            delta.get("partial_json").and_then(|t| t.as_str())
+                        {
+                            json_accum.entry(index).or_default().push_str(partial);
+                        }
+                    }
+                    _ => {}
                 }
             }
             "content_block_stop" => {
