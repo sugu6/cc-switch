@@ -4551,9 +4551,9 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 if let Some(text) = unkeyed_remaining {
                     if !text.is_empty() {
                         let index = next_content_index;
-                        // Allow unused assignment - index is used in the loop below
-                        #[allow(unused_assignments)]
                         next_content_index = next_content_index.wrapping_add(1);
+                        // Use index to avoid unused variable warning
+                        let _ = index;
                         for event in text_block_events(index, &text) {
                             yield Ok(event);
                         }
