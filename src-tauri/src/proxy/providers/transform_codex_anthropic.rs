@@ -1502,9 +1502,7 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                         }
                     }
                     "input_json_delta" => {
-                        if let Some(partial) =
-                            delta.get("partial_json").and_then(|t| t.as_str())
-                        {
+                        if let Some(partial) = delta.get("partial_json").and_then(|t| t.as_str()) {
                             json_accum.entry(index).or_default().push_str(partial);
                         }
                     }
