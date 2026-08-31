@@ -53,6 +53,7 @@ use bytes::Bytes;
 use futures::StreamExt;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 
 // ============================================================================
 // 健康检查和状态查询（简单端点）
