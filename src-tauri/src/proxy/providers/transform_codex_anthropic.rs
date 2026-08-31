@@ -1463,13 +1463,13 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 let index = value
                     .get("index")
                     .and_then(|v| v.as_u64())
-                    .or_else(|| {
-                        // 尝试从 item_id 或 output_index 推断
-                        value.get("output_index").and_then(|v| v.as_u64())
-                    })
+                    .or_else(|| value.get("output_index").and_then(|v| v.as_u64()))
                     .unwrap_or(0);
 
-                if index == 0 && !value.get("index").is_some() && !value.get("output_index").is_some() {
+                if index == 0
+                    && !value.get("index").is_some()
+                    && !value.get("output_index").is_some()
+                {
                     // 记录警告但继续处理，避免完全丢失内容
                     log::debug!(
                         "[Anthropic SSE] content_block_delta missing index, using default 0"
@@ -1516,9 +1516,7 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 let index = value
                     .get("index")
                     .and_then(|v| v.as_u64())
-                    .or_else(|| {
-                        value.get("output_index").and_then(|v| v.as_u64())
-                    })
+                    .or_else(|| value.get("output_index").and_then(|v| v.as_u64()))
                     .unwrap_or(0);
 
                 if let Some(accum) = json_accum.get(&index) {
