@@ -4552,8 +4552,6 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                     if !text.is_empty() {
                         let index = next_content_index;
                         next_content_index = next_content_index.wrapping_add(1);
-                        // Use index to avoid unused variable warning
-                        let _ = index;
                         for event in text_block_events(index, &text) {
                             yield Ok(event);
                         }
@@ -4606,9 +4604,9 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                         }
                         for text in pending_text {
                             let index = reusable_text_index.take().unwrap_or_else(|| {
-                                let index = next_content_index;
-                                next_content_index += 1;
-                                index
+                                let idx = next_content_index;
+                                next_content_index = next_content_index.wrapping_add(1);
+                                idx
                             });
                             for event in text_block_events(index, &text) {
                                 yield Ok(event);
