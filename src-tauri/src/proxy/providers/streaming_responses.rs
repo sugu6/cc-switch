@@ -4550,10 +4550,13 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 // 发送未发送的未键文本（流截断时保留的内容）
                 if let Some(text) = unkeyed_remaining {
                     if !text.is_empty() {
-                        let index = next_content_index;
-                        next_content_index += 1;
-                        for event in text_block_events(index, &text) {
-                            yield Ok(event);
+                        #[allow(unused_assignments)]
+                        {
+                            let index = next_content_index;
+                            next_content_index += 1;
+                            for event in text_block_events(index, &text) {
+                                yield Ok(event);
+                            }
                         }
                     }
                 }
