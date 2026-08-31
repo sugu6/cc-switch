@@ -4559,12 +4559,6 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 }
                 // Text-only partial output is safe to expose as a max-token style
                 // incomplete turn. Close blocks before the terminal events.
-                // 尝试从 streamed_text 中获取未发送的文本内容
-                let unkeyed_remaining = if !streamed_text.unkeyed.is_empty() {
-                    Some(streamed_text.unkeyed.clone())
-                } else {
-                    None
-                };
                 let mut remaining: Vec<u32> = open_indices.iter().copied().collect();
                 remaining.sort_unstable();
                 for index in remaining {
@@ -4572,16 +4566,6 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                         "content_block_stop",
                         &json!({"type":"content_block_stop","index":index}),
                     ));
-                }
-                // 发送未发送的未键文本（流截断时保留的内容）
-                if let Some(text) = unkeyed_remaining {
-                    if !text.is_empty() {
-                        let index = next_content_index;
-                        next_content_index = next_content_index.wrapping_add(1);
-                        for event in text_block_events(index, &text) {
-                            yield Ok(event);
-                        }
-                    }
                 }
                 if !has_sent_message_start {
                     yield Ok(anthropic_sse(
