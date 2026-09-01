@@ -6220,7 +6220,11 @@ mod tests {
             .and_then(Value::as_u64)
             .unwrap();
 
-        assert!(!events.iter().any(|event| {
+        // The stream is truncated mid-function_call, so no message_delta/message_stop
+        // is emitted — but the dangling function block must still be closed with a
+        // content_block_stop so the downstream client doesn't report
+        // "Content block not found" on the next turn.
+        assert!(events.iter().any(|event| {
             event.get("type").and_then(Value::as_str) == Some("content_block_stop")
                 && event.get("index").and_then(Value::as_u64) == Some(function_index)
         }));
