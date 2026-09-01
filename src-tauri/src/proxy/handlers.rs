@@ -2327,21 +2327,33 @@ fn body_looks_like_sse(body: &str) -> bool {
         return false;
     }
     // Special case for bare ":" prefix used by OpenAI/SSE spec comments:
-    // must be followed by at least 2 non-whitespace chars (e.g. ": PROCESSING")
-    // to avoid misclassifying error bodies like ": Bad Gateway".
+    // Only match standard SSE comment format ": IDENTIFIER" (e.g. ": PROCESSING",
+    // ": ping"). Reject common error bodies like ": Bad Gateway" or
+    // ": upstream timeout" by requiring the first non-whitespace char to be
+    // uppercase (SSE comment identifiers use uppercase) and no following
+    // alphabetic word that looks like normal prose.
     if trimmed.starts_with(':') {
         let after_colon = trimmed.strip_prefix(':').unwrap_or("");
-        let non_ws_after_colon: String =
-            after_colon.chars().filter(|c| !c.is_whitespace()).collect();
-        return non_ws_after_colon.len() >= 2;
+        let trimmed_after = after_colon.trim_start();
+        // Must start with an uppercase letter followed by lowercase letters
+        // (like "PROCESSING", "PING") to qualify as a real SSE comment.
+        // ": Bad Gateway" fails this because 'B' is uppercase but 'ad' has
+        // lowercase chars making it look like normal prose, not an SSE id.
+        // Actually: stricter check — SSE comments are typically short
+        // identifiers (≤ 20 chars) with no spaces.
+        trimmed_after
+            .chars()
+            .take(1)
+            .any(|c| c.is_ascii_uppercase())
+            && !trimmed_after.contains(' ')
+            && trimmed_after.len() <= 20
+    } else {
+        // For other SSE field prefixes (data:, event:, id:, retry:), just check presence.
+        ["data:", "event:", "id:", "retry:"]
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix))
     }
-    // For other SSE field prefixes (data:, event:, id:, retry:), just check presence.
-    ["data:", "event:", "id:", "retry:"]
-        .iter()
-        .any(|prefix| trimmed.starts_with(prefix))
 }
-
-/// 构造带现场诊断的上游解析错误：只附结构化分类与元数据，
 /// 避免响应正文经错误链间接进入持久化日志。
 fn upstream_body_parse_error(
     prefix: &str,
