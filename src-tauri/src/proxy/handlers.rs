@@ -2331,7 +2331,8 @@ fn body_looks_like_sse(body: &str) -> bool {
     // to avoid misclassifying error bodies like ": Bad Gateway".
     if trimmed.starts_with(':') {
         let after_colon = &trimmed[1..];
-        let non_ws_after_colon: String = after_colon.chars().filter(|c| !c.is_whitespace()).collect();
+        let non_ws_after_colon: String =
+            after_colon.chars().filter(|c| !c.is_whitespace()).collect();
         return non_ws_after_colon.len() >= 2;
     }
     // For other SSE field prefixes (data:, event:, id:, retry:), just check presence.
