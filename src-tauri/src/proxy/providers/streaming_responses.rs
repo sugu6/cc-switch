@@ -4588,47 +4588,11 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 ));
                 yield Ok(anthropic_sse("message_stop", &json!({"type":"message_stop"})));
             } else {
-                // A truncated tool/reasoning block cannot be safely finalized with
-                // message_delta/message_stop: tool JSON may be partial and thinking
-                // may be missing its signature. But content_block_stop itself is
-                // safe — it only signals "this block ended", not "it is complete".
+                // A truncated tool/reasoning block cannot be safely finalized: tool
+                // JSON may be partial and thinking may be missing its signature.
                 // Closing dangling blocks prevents the downstream client from seeing
                 // a content_block_start without a matching stop, which surfaces as
                 // "Content block not found" on the next turn.
-                //
-                // Text content recovery (resolve-conversation-truncation): when
-                // preserve_web_search_citations is enabled, attempt to flush any
-                // buffered citation text before closing remaining blocks. This avoids
-                // silent truncation of substantive text output even inside a stream error.
-                if preserve_web_search_citations {
-                    let pending_text = buffered_citation_text.render_pending_parts();
-                    let mut reusable_text_index = None;
-                    if !pending_text.is_empty() {
-                        if let Some(index) = current_text_index.take() {
-                            let was_open = open_indices.remove(&index);
-                            if was_open {
-                                yield Ok(anthropic_sse(
-                                    "content_block_stop",
-                                    &json!({"type":"content_block_stop","index":index}),
-                                ));
-                            } else {
-                                reusable_text_index = Some(index);
-                            }
-                        }
-                        for text in pending_text {
-                            let index = reusable_text_index.take().unwrap_or_else(|| {
-                                let idx = next_content_index;
-                                next_content_index = next_content_index.wrapping_add(1);
-                                idx
-                            });
-                            for event in text_block_events(index, &text) {
-                                yield Ok(event);
-                            }
-                        }
-                    }
-                }
-                // Close any remaining dangling blocks (text/reasoning/tool) so the
-                // downstream client never sees an unclosed content_block_start.
                 let mut dangling: Vec<u32> = open_indices.iter().copied().collect();
                 dangling.sort_unstable();
                 for index in dangling {
