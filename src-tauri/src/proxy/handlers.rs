@@ -2327,15 +2327,21 @@ fn body_looks_like_sse(body: &str) -> bool {
         return false;
     }
     // Special case for bare ":" prefix used by OpenAI/SSE spec comments:
-    // SSE comments are all-uppercase identifiers (e.g. ": PROCESSING",
-    // ": OPENROUTER PROCESSING"). Reject error bodies like ": Bad Gateway"
-    // or ": upstream timeout" which contain lowercase prose.
+    // SSE comments appear as the first line of the body (e.g. ": PROCESSING",
+    // ": OPENROUTER PROCESSING") followed by newline-separated data lines.
+    // Reject error bodies like ": Bad Gateway" which contain lowercase prose.
     if trimmed.starts_with(':') {
-        let after_colon = trimmed.strip_prefix(':').unwrap_or("").trim_start();
-        // SSE comment identifiers are uppercase only (possibly with spaces).
-        // Any lowercase letter means it's normal prose, not an SSE comment.
-        after_colon.chars().all(|c| c.is_whitespace() || c.is_ascii_uppercase())
-            && !after_colon.is_empty()
+        // Only the first line matters for SSE comment detection
+        let first_line = trimmed
+            .lines()
+            .next()
+            .unwrap_or(trimmed)
+            .strip_prefix(':')
+            .unwrap_or("")
+            .trim_start();
+        // SSE comment identifiers are all-uppercase; any lowercase means prose.
+        !first_line.is_empty()
+            && first_line.chars().all(|c| c.is_whitespace() || c.is_ascii_uppercase())
     } else {
         // For other SSE field prefixes (data:, event:, id:, retry:), just check presence.
         ["data:", "event:", "id:", "retry:"]
