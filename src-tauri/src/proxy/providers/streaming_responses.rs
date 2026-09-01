@@ -3041,6 +3041,19 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                                                     yield Ok(event);
                                                 }
                                             } else {
+                                                // Close dangling blocks before the error so the
+                                                // downstream client doesn't see a content_block_start
+                                                // without a matching stop ("Content block not found").
+                                                let mut dangling: Vec<u32> =
+                                                    open_indices.iter().copied().collect();
+                                                dangling.sort_unstable();
+                                                for index in dangling {
+                                                    yield Ok(anthropic_sse(
+                                                        "content_block_stop",
+                                                        &json!({"type":"content_block_stop","index":index}),
+                                                    ));
+                                                    open_indices.remove(&index);
+                                                }
                                                 yield Ok(anthropic_error_sse(
                                                     "Responses upstream started a web search beyond max_uses while another content block was incomplete",
                                                     "stream_truncated",
@@ -4266,6 +4279,19 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                                                     yield Ok(event);
                                                 }
                                             } else {
+                                                // Close dangling blocks before the error so the
+                                                // downstream client doesn't see a content_block_start
+                                                // without a matching stop ("Content block not found").
+                                                let mut dangling: Vec<u32> =
+                                                    open_indices.iter().copied().collect();
+                                                dangling.sort_unstable();
+                                                for index in dangling {
+                                                    yield Ok(anthropic_sse(
+                                                        "content_block_stop",
+                                                        &json!({"type":"content_block_stop","index":index}),
+                                                    ));
+                                                    open_indices.remove(&index);
+                                                }
                                                 yield Ok(anthropic_error_sse(
                                                     "Responses upstream started a web search beyond max_uses while another content block was incomplete",
                                                     "stream_truncated",
@@ -4555,8 +4581,22 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 ));
                 yield Ok(anthropic_sse("message_stop", &json!({"type":"message_stop"})));
             } else {
-                // A truncated tool/reasoning block cannot be safely finalized: tool
-                // JSON may be partial and thinking may be missing its signature.
+                // A truncated tool/reasoning block cannot be safely finalized with
+                // message_delta/message_stop: tool JSON may be partial and thinking
+                // may be missing its signature. But content_block_stop itself is
+                // safe — it only signals "this block ended", not "it is complete".
+                // Closing dangling blocks prevents the downstream client from seeing
+                // a content_block_start without a matching stop, which surfaces as
+                // "Content block not found" on the next turn.
+                let mut dangling: Vec<u32> = open_indices.iter().copied().collect();
+                dangling.sort_unstable();
+                for index in dangling {
+                    yield Ok(anthropic_sse(
+                        "content_block_stop",
+                        &json!({"type":"content_block_stop","index":index}),
+                    ));
+                    open_indices.remove(&index);
+                }
                 yield Ok(anthropic_error_sse(
                     "Responses upstream stream ended before a terminal event",
                     "stream_truncated",
@@ -6251,7 +6291,11 @@ mod tests {
             .and_then(Value::as_u64)
             .unwrap();
 
-        assert!(!events.iter().any(|event| {
+        // The stream is truncated mid-reasoning, so no message_delta/message_stop
+        // is emitted — but the dangling reasoning block must still be closed with a
+        // content_block_stop so the downstream client doesn't report
+        // "Content block not found" on the next turn.
+        assert!(events.iter().any(|event| {
             event.get("type").and_then(Value::as_str) == Some("content_block_stop")
                 && event.get("index").and_then(Value::as_u64) == Some(reasoning_index)
         }));
