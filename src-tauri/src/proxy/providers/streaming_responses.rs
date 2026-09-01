@@ -277,15 +277,11 @@ fn content_part_key(data: &Value) -> Option<String> {
     ) {
         return Some(format!("part:out:{output_index}:{content_index}"));
     }
-    // 兼容网关省略了 content_index 时的 fallback：
-    // 如果提供了 item_id，使用 item_id 作为标识（因为通常只有一个输出文本块）
-    if let Some(item_id) = data.get("item_id").and_then(|v| v.as_str()) {
-        return Some(format!("part:{item_id}:0"));
-    }
-    // 如果提供了 output_index 但没有 content_index
-    if let Some(output_index) = data.get("output_index").and_then(|v| v.as_u64()) {
-        return Some(format!("part:out:{output_index}:0"));
-    }
+    // 注意：不在这里添加 fallback。
+    // 如果缺少 content_index，返回 None 让 resolve_content_index 回退到
+    // fallback_open_index，这样可以避免在流还未建立稳定绑定时就分配一个固定索引。
+    // 第三方网关若省略 content_index，后续的事件（如 output_text.done）通常会携带
+    // 完整键信息，届时可以正确绑定。
     None
 }
 
