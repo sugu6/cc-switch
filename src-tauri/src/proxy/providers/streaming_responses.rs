@@ -4564,36 +4564,6 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
             } else {
                 // A truncated tool/reasoning block cannot be safely finalized: tool
                 // JSON may be partial and thinking may be missing its signature.
-                // 文本内容不完整但属于实质性输出的情况：
-                // 关闭未闭合的文本块，并尝试从 buffered_citation_text 提取未发送的文本。
-                // 这避免了 stream_truncated 错误导致的对话截断。
-                if preserve_web_search_citations {
-                    let pending_text = buffered_citation_text.render_pending_parts();
-                    let mut reusable_text_index = None;
-                    if !pending_text.is_empty() {
-                        if let Some(index) = current_text_index.take() {
-                            let was_open = open_indices.remove(&index);
-                            if was_open {
-                                yield Ok(anthropic_sse(
-                                    "content_block_stop",
-                                    &json!({"type":"content_block_stop","index":index}),
-                                ));
-                            } else {
-                                reusable_text_index = Some(index);
-                            }
-                        }
-                        for text in pending_text {
-                            let index = reusable_text_index.take().unwrap_or_else(|| {
-                                let idx = next_content_index;
-                                next_content_index = next_content_index.wrapping_add(1);
-                                idx
-                            });
-                            for event in text_block_events(index, &text) {
-                                yield Ok(event);
-                            }
-                        }
-                    }
-                }
                 yield Ok(anthropic_error_sse(
                     "Responses upstream stream ended before a terminal event",
                     "stream_truncated",
