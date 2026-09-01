@@ -4588,8 +4588,10 @@ fn create_anthropic_sse_stream_from_responses_raw<E: std::error::Error + Send + 
                 ));
                 yield Ok(anthropic_sse("message_stop", &json!({"type":"message_stop"})));
             } else {
-                // A truncated tool/reasoning block cannot be safely finalized: tool
-                // JSON may be partial and thinking may be missing its signature.
+                // A truncated tool/reasoning block cannot be safely finalized with
+                // message_delta/message_stop: tool JSON may be partial and thinking
+                // may be missing its signature. But content_block_stop itself is
+                // safe — it only signals "this block ended", not "it is complete".
                 // Closing dangling blocks prevents the downstream client from seeing
                 // a content_block_start without a matching stop, which surfaces as
                 // "Content block not found" on the next turn.
