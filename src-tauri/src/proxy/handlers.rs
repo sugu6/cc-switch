@@ -2315,11 +2315,16 @@ fn responses_sse_to_response_value(body: &str) -> Result<Value, ProxyError> {
 /// 仅在 JSON 解析已失败后调用：合法 JSON 不可能以这些前缀开头，误判面为零。
 /// 覆盖 SSE 规范的全部四种字段行；包含 ":" 是因为 OpenRouter 等会在流前发
 /// `: PROCESSING` 注释行。
+///
+/// 增加一个额外守卫：如果主体只有 " : " 前缀（无后续非空白内容），则不视为 SSE。
+/// 这防止上游纯文本错误（如 ": upstream timeout"）被误判为 SSE 并进入聚合路径，
+/// 导致诊断信息被 "No response.completed event" 错误掩盖。
 fn body_looks_like_sse(body: &str) -> bool {
     let trimmed = body.trim_start_matches('\u{feff}').trim_start();
-    ["data:", "event:", "id:", "retry:", ":"]
-        .iter()
-        .any(|prefix| trimmed.starts_with(prefix))
+    !trimmed.is_empty()
+        && ["data:", "event:", "id:", "retry:", ":"]
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix))
 }
 
 /// 构造带现场诊断的上游解析错误：只附结构化分类与元数据，
@@ -2893,6 +2898,10 @@ mod tests {
         assert!(!body_looks_like_sse("<html><body>blocked</body></html>"));
         assert!(!body_looks_like_sse("Bad Gateway"));
         assert!(!body_looks_like_sse(""));
+        // 纯冒号开头的错误体（如上游健康检查返回 ": connection refused"）不应误判
+        assert!(!body_looks_like_sse(": Bad Gateway"));
+        assert!(!body_looks_like_sse(": upstream timeout\n"));
+        assert!(!body_looks_like_sse(": "));
     }
 
     #[test]
