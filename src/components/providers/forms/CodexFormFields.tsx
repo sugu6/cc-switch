@@ -247,10 +247,11 @@ function InputModalitiesEditor({
 
   return (
     <div className="flex items-center gap-3">
-      <label className="inline-flex items-center gap-1.5 cursor-not-allowed text-xs text-foreground">
+      <label className="inline-flex items-center gap-1.5 text-xs text-foreground opacity-70">
         <Checkbox
-          checked
+          checked={true}
           disabled
+          aria-disabled
           className="h-3 w-3 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
           aria-label={t("codexConfig.inputModalityText", { defaultValue: "Text" })}
         />
