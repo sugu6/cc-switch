@@ -2330,7 +2330,7 @@ fn body_looks_like_sse(body: &str) -> bool {
     // must be followed by at least 2 non-whitespace chars (e.g. ": PROCESSING")
     // to avoid misclassifying error bodies like ": Bad Gateway".
     if trimmed.starts_with(':') {
-        let after_colon = &trimmed[1..];
+        let after_colon = trimmed.strip_prefix(':').unwrap_or("");
         let non_ws_after_colon: String =
             after_colon.chars().filter(|c| !c.is_whitespace()).collect();
         return non_ws_after_colon.len() >= 2;
