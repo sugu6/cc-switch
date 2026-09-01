@@ -2341,7 +2341,9 @@ fn body_looks_like_sse(body: &str) -> bool {
             .trim_start();
         // SSE comment identifiers are all-uppercase; any lowercase means prose.
         !first_line.is_empty()
-            && first_line.chars().all(|c| c.is_whitespace() || c.is_ascii_uppercase())
+            && first_line
+                .chars()
+                .all(|c| c.is_whitespace() || c.is_ascii_uppercase())
     } else {
         // For other SSE field prefixes (data:, event:, id:, retry:), just check presence.
         ["data:", "event:", "id:", "retry:"]
