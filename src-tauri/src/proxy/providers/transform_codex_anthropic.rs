@@ -1466,9 +1466,8 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                     .or_else(|| value.get("output_index").and_then(|v| v.as_u64()))
                     .unwrap_or(0);
 
-                if index == 0
-                    && value.get("index").is_none()
-                    && value.get("output_index").is_none()
+                if index == 0 && value.get("index").is_none() && value.get("output_index").is_none()
+                {
                     // 记录警告但继续处理，避免完全丢失内容
                     log::debug!(
                         "[Anthropic SSE] content_block_delta missing index, using default 0"
