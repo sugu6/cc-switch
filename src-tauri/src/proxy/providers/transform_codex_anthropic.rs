@@ -1463,13 +1463,12 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 let index = value
                     .get("index")
                     .and_then(|v| v.as_u64())
-                    .or_else(|| {
-                        // 尝试从 item_id 或 output_index 推断
-                        value.get("output_index").and_then(|v| v.as_u64())
-                    })
+                    .or_else(|| value.get("output_index").and_then(|v| v.as_u64()))
                     .unwrap_or(0);
 
-                if index == 0 && value.get("index").is_none() && value.get("output_index").is_none() {
+                if index == 0
+                    && value.get("index").is_none()
+                    && value.get("output_index").is_none()
                     // 记录警告但继续处理，避免完全丢失内容
                     log::debug!(
                         "[Anthropic SSE] content_block_delta missing index, using default 0"
@@ -1477,38 +1476,36 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 }
 
                 let delta = value.get("delta").cloned().unwrap_or(json!({}));
-                    match delta.get("type").and_then(|t| t.as_str()).unwrap_or("") {
-                        "text_delta" => {
-                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                                append_str_field(
-                                    blocks.entry(index).or_insert(json!({})),
-                                    "text",
-                                    text,
-                                );
-                            }
+                match delta.get("type").and_then(|t| t.as_str()).unwrap_or("") {
+                    "text_delta" => {
+                        if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                            append_str_field(
+                                blocks.entry(index).or_insert(json!({})),
+                                "text",
+                                text,
+                            );
                         }
-                        "thinking_delta" => {
-                            if let Some(text) = delta.get("thinking").and_then(|t| t.as_str()) {
-                                append_str_field(
-                                    blocks.entry(index).or_insert(json!({})),
-                                    "thinking",
-                                    text,
-                                );
-                            }
-                        }
-                        "signature_delta" => {
-                            if let Some(sig) = delta.get("signature").and_then(|t| t.as_str()) {
-                                blocks.entry(index).or_insert(json!({}))["signature"] = json!(sig);
-                            }
-                        }
-                        }
-                        "input_json_delta" => {
-                            if let Some(partial) = delta.get("partial_json").and_then(|t| t.as_str()) {
-                                json_accum.entry(index).or_default().push_str(partial);
-                            }
-                        }
-                        _ => {}
                     }
+                    "thinking_delta" => {
+                        if let Some(text) = delta.get("thinking").and_then(|t| t.as_str()) {
+                            append_str_field(
+                                blocks.entry(index).or_insert(json!({})),
+                                "thinking",
+                                text,
+                            );
+                        }
+                    }
+                    "signature_delta" => {
+                        if let Some(sig) = delta.get("signature").and_then(|t| t.as_str()) {
+                            blocks.entry(index).or_insert(json!({}))["signature"] = json!(sig);
+                        }
+                    }
+                    "input_json_delta" => {
+                        if let Some(partial) = delta.get("partial_json").and_then(|t| t.as_str()) {
+                            json_accum.entry(index).or_default().push_str(partial);
+                        }
+                    }
+                    _ => {}
                 }
             }
             "content_block_stop" => {
@@ -1516,9 +1513,7 @@ pub fn anthropic_sse_to_message_value(body: &str) -> Result<Value, ProxyError> {
                 let index = value
                     .get("index")
                     .and_then(|v| v.as_u64())
-                    .or_else(|| {
-                        value.get("output_index").and_then(|v| v.as_u64())
-                    })
+                    .or_else(|| value.get("output_index").and_then(|v| v.as_u64()))
                     .unwrap_or(0);
 
                 if let Some(accum) = json_accum.get(&index) {
