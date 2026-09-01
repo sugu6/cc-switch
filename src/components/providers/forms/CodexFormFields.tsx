@@ -221,7 +221,6 @@ const CODEX_REASONING_LEVELS = [
 // values, so "back to Auto" needs a non-empty value mapped to undefined.
 const AUTO_DEFAULT_REASONING_LEVEL = "__auto__";
 
-
 const CODEX_INPUT_MODALITIES = ["text", "image"] as const;
 
 function InputModalitiesEditor({
@@ -253,18 +252,26 @@ function InputModalitiesEditor({
           disabled
           aria-disabled
           className="h-3 w-3 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
-          aria-label={t("codexConfig.inputModalityText", { defaultValue: "Text" })}
+          aria-label={t("codexConfig.inputModalityText", {
+            defaultValue: "Text",
+          })}
         />
-        <span>{t("codexConfig.inputModalityText", { defaultValue: "Text" })}</span>
+        <span>
+          {t("codexConfig.inputModalityText", { defaultValue: "Text" })}
+        </span>
       </label>
       <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">
         <Checkbox
           checked={selected.includes("image")}
           onCheckedChange={() => toggleModality("image")}
           className="h-3 w-3 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
-          aria-label={t("codexConfig.inputModalityImage", { defaultValue: "Image" })}
+          aria-label={t("codexConfig.inputModalityImage", {
+            defaultValue: "Image",
+          })}
         />
-        <span>{t("codexConfig.inputModalityImage", { defaultValue: "Image" })}</span>
+        <span>
+          {t("codexConfig.inputModalityImage", { defaultValue: "Image" })}
+        </span>
       </label>
     </div>
   );
