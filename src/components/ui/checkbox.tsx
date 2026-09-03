@@ -47,11 +47,11 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           onChange?.(event);
           onCheckedChange?.(event.target.checked);
         }}
-        className={cn(`
-            "w-4 h-4 text-blue-500 bg-white dark:bg-gray-800 border-border-default rounded focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-2",`
-            props.disabled && "opacity-50 cursor-not-allowed",`
-            className,`
-          )}
+        className={cn(
+          "w-4 h-4 text-blue-500 bg-white dark:bg-gray-800 border-border-default rounded focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-2",
+          props.disabled && "opacity-50 cursor-not-allowed",
+          className,
+        )}
       />
     );
   },
@@ -61,4 +61,3 @@ Checkbox.displayName = "Checkbox";
 
 export { Checkbox };
 export type { CheckboxProps, CheckedState };
-
